@@ -1,17 +1,13 @@
 CC=g++
 SRCS=$(wildcard *.cpp)
-OBJS=$(patsubst %.cpp, %.o, $(SRCS))
 TARGET=WebServer
-CFLAGS=-Wall -I../include -L../lib -lmyunp -lpthread
+CFLAGS=-Wall -lmyunp -lpthread
 
 ALL:$(TARGET)
-%.o:%.cpp
-	$(CC) -c $< $(CFLAGS) -o $@
-
-$(TARGET):$(OBJS)
-	$(CC) $(OBJS) $(CFLAGS) -o $@ 
+$(TARGET):$(SRCS)
+	$(CC) $(SRCS) $(CFLAGS) -o $@ 
 
 clean:
-	-rm -rf $(TARGET) $(OBJS)
+	-rm -rf $(TARGET)
 
 .PHONY:clean ALL
