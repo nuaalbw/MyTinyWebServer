@@ -27,8 +27,8 @@ static void addSignal(int sig, void(*handler)(int), bool restart = true)
 	}
 	sigfillset(&sa.sa_mask);
 	int ret = sigaction(sig, &sa, nullptr);
-	if (ret == -1) 
-		sys_error("addSignal: sigaction error");
+	// if (ret == -1) 
+	// 	sys_error("addSignal: sigaction error");
 }
 
 static void showError(int connfd, const char* info)
@@ -63,14 +63,14 @@ int main(int argc, char* argv[])
 
 	/* 创建socket，得到监听文件描述符listenfd  */
 	int listenfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (listenfd < 0)
-		sys_error("socket error");
+	// if (listenfd < 0)
+	// 	sys_error("socket error");
 
 	/* 通过设置SO_LINGER选项，保证服务器数据能够发送到对端 */
 	struct linger tmp = { 1, 0 };
 	int ret = setsockopt(listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
-	if (ret == -1)
-		sys_error("setsockopt error");
+	// if (ret == -1)
+	// 	sys_error("setsockopt error");
 
 	/* 为listenfd绑定地址结构 */
 	struct sockaddr_in address;
@@ -79,18 +79,18 @@ int main(int argc, char* argv[])
 	address.sin_port = htons(atoi(SERV_PORT));
 	address.sin_addr.s_addr = INADDR_ANY;
 	ret = bind(listenfd, (struct sockaddr*)&address, sizeof(address));
-	if (ret < 0)
-		sys_error("bind error");
+	// if (ret < 0)
+	// 	sys_error("bind error");
 
 	ret = listen(listenfd, LISTENQ);
-	if (ret < 0)
-		sys_error("listen error");
+	// if (ret < 0)
+	// 	sys_error("listen error");
 
 	/* 创建epoll内核事件表 */
 	epoll_event events[MAX_EVENT_NUMBER];
 	int epollfd = epoll_create(5);
-	if (epollfd < 0)
-		sys_error("epoll_create error");
+	// if (epollfd < 0)
+	// 	sys_error("epoll_create error");
 	addfd(epollfd, listenfd, false);
 	HttpConn::m_epollfd = epollfd;
 	

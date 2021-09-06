@@ -1,12 +1,12 @@
 /*************************************************************************
-	> File Name: unp.h
+	> File Name: Web.h
 	> Author: lbw
-	> Mail: 296273803@qq.com 
+	> Mail: nuaalbw@163.com 
 	> Created Time: 2021年07月03日 星期六 17时44分37秒
  ************************************************************************/
 
-#ifndef _UNP_H__
-#define _UNP_H__
+#ifndef _WEB_H__
+#define _WEB_H__
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,25 +36,5 @@ typedef void Sigfunc(int);
 #define SERV_PORT	"9999"
 #define LISTENQ		20	
 #define MAXLINE		1024
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-ssize_t readline(int fd, void* vptr, size_t maxlen);
-
-ssize_t readlinebuf(void** vptrptr);
-
-ssize_t readn(int fd, void* vptr, size_t n);
-
-ssize_t writen(int fd, const void* vptr, size_t n);
-
-void sys_error(const char* str);
-
-Sigfunc* Signal(int signo, Sigfunc* func);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif
