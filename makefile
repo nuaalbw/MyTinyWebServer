@@ -1,7 +1,7 @@
 CC=g++
 SRCS=$(wildcard *.cpp)
 TARGET=WebServer
-CFLAGS=-Wall -lmyunp -lpthread
+CFLAGS=-Wall -lmyunp -lpthread -lmysqlclient
 
 ALL:$(TARGET)
 $(TARGET):$(SRCS)

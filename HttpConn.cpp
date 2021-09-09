@@ -18,8 +18,6 @@ const char* ERROR_404_TITLE = "Not Found";
 const char* ERROR_404_FORM = "The requested file was not found on this server.\n";
 const char* ERROR_500_TITLE = "Internal Error";
 const char* ERROR_500_FORM = "There was an unusual problem serving the requested file.\n";
-/* 网站的根目录 */
-const char* DOC_ROOT = "/home/lbw/music";
 
 /* 将文件描述符设置为非阻塞 */
 static int setNonblocking(int fd)
@@ -31,11 +29,17 @@ static int setNonblocking(int fd)
 }
 
 /* 向epoll内核事件表中注册文件描述符事件 */
-void addfd(int epollfd, int fd, bool oneShot)
+void addfd(int epollfd, int fd, bool oneShot, TriggerMode mode)
 {
 	epoll_event event;
 	event.data.fd = fd;
-	event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+
+	if (mode == EPOLL_ET) {
+		event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+	}
+	else {
+		event.events = EPOLLIN | EPOLLRDHUP;
+	}
 	if (oneShot) {
 		event.events |= EPOLLONESHOT;
 	}
@@ -50,11 +54,17 @@ void removefd(int epollfd, int fd)
 	close(fd);
 }
 
-static void modfd(int epollfd, int fd, int ev)
+static void modfd(int epollfd, int fd, int ev, TriggerMode mode)
 {
 	epoll_event event;
 	event.data.fd = fd;
-	event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
+
+	if (mode == EPOLL_ET) {
+		event.events = ev | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
+	}
+	else {
+		event.events = ev | EPOLLONESHOT | EPOLLRDHUP;
+	}
 	epoll_ctl(epollfd, EPOLL_CTL_MOD, fd, &event);
 }
 
@@ -68,24 +78,38 @@ void HttpConn::closeConn(bool realClose)
 		removefd(m_epollfd, m_sockfd);
 		m_sockfd = -1;
 		m_userCount--;	/* 关闭一个连接时, 将客户总量减1 */
+		printf("close %d\n", m_sockfd);
 	}
 }
-
-void HttpConn::init(int sockfd, const sockaddr_in& addr)
+void HttpConn::init(int sockfd, const sockaddr_in& addr, char* root, TriggerMode mode, 
+			int closeLog, string user, string password, string dbName)
 {
 	m_sockfd = sockfd;
 	m_address = addr;
+
 	/* 如下两行是为了避免TIME_WAIT状态，仅用于调试，实际使用时应去掉 */
 	int reuse = 1;
 	setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
-	addfd(m_epollfd, sockfd, true);
+	addfd(m_epollfd, sockfd, true, mode);
 	m_userCount++;
+
+	/* 当浏览器出现重置时，可能是网站根目录出错或http响应出错或访问的文件内容为空 */
+	m_docRoot = root;
+	m_mode = mode;
+	m_closeLog = closeLog;
+
+	/* 数据库相关参数初始化 */
+	strcpy(m_dbUser, user.c_str());
+	strcpy(m_dbPassword, password.c_str());
+	strcpy(m_dbName, dbName.c_str());
+
 	init();
 }
 
 void HttpConn::init()
 {
+	m_mysql = nullptr;
 	m_checkState = CHECK_STATE_REQUESTLINE;
 	m_linger = false;
 	m_method = GET;
@@ -99,9 +123,41 @@ void HttpConn::init()
 	m_writeIdx = 0;
 	m_bytesToSend = 0;
 	m_bytesHaveSend = 0;
+	m_timerFlag = 0;
+	m_improv = 0;
+	m_state = 0;
 	bzero(m_readBuf, READ_BUFFER_SIZE);
 	bzero(m_writeBuf, WRITE_BUFFER_SIZE);
 	bzero(m_realFile, FILENAME_LEN);
+}
+
+sockaddr_in* HttpConn::getAddress()
+{
+	return &m_address;
+}
+
+void HttpConn::initMysqlResult(ConnectionPool* connPool)
+{
+	/* 从数据库中取出一个连接 */
+	MYSQL* mysql = nullptr;
+	ConnectionRAII mysqlConn(&mysql, connPool);
+
+	/* 从user表中检索username, passwd数据 */
+	if (mysql_query(mysql, "SELECT username, passwd FROM user;")) {
+		LOG_ERROR("mysql query error: %s\n", mysql_error(mysql));
+	}
+	/* 从表中检索完整的结果集 */
+	MYSQL_RES* result = mysql_store_result(mysql);
+	/* 返回结果集中的列数 */
+	int numFields = mysql_num_fields(result);
+	/* 返回所有字段结构的数组 */
+	MYSQL_FIELD* fields = mysql_fetch_fields(result);
+	/* 利用哈希表记录下所有客户的用户名和密码 */
+	while (MYSQL_ROW row = mysql_fetch_row(result)) {
+		string name(row[0]);
+		string pwd(row[1]);
+		m_users[name] = pwd;
+	}
 }
 
 /* 从状态机 */
@@ -139,19 +195,31 @@ bool HttpConn::read()
 		return false;
 	}
 	int bytesRead = 0;
-	while (true) {
-		bytesRead = recv(m_sockfd, m_readBuf + m_readIdx, READ_BUFFER_SIZE - 
-						m_readIdx, 0);
-		if (bytesRead == -1) {
-			if (errno == EAGAIN || errno == EWOULDBLOCK) {
-				break;
-			}
-			return false;
-		}
-		else if (bytesRead == 0) {
+
+	/* LT模式下读取数据 */
+	if (m_mode == EPOLL_LT) {
+		bytesRead = recv(m_sockfd, m_readBuf + m_readIdx, READ_BUFFER_SIZE - m_readIdx, 0);
+		if (bytesRead <= 0) {
 			return false;
 		}
 		m_readIdx += bytesRead;
+	}
+	/* ET模式下读取数据，需一次性将数据读完 */
+	else {
+		while (true) {
+			bytesRead = recv(m_sockfd, m_readBuf + m_readIdx, READ_BUFFER_SIZE - 
+							m_readIdx, 0);
+			if (bytesRead == -1) {
+				if (errno == EAGAIN || errno == EWOULDBLOCK) {
+					break;
+				}
+				return false;
+			}
+			else if (bytesRead == 0) {
+				return false;
+			}
+			m_readIdx += bytesRead;
+		}
 	}
 	return true;
 }
@@ -168,6 +236,9 @@ HttpConn::HTTP_CODE HttpConn::parseRequestLine(char* text)
 	char* method = text;
 	if (strcasecmp(method, "GET") == 0) {
 		m_method = GET;
+	}
+	else if (strcasecmp(method, "POST") == 0) {
+		m_method = POST;
 	}
 	else {
 		return BAD_REQUEST;
@@ -188,8 +259,17 @@ HttpConn::HTTP_CODE HttpConn::parseRequestLine(char* text)
 		m_url += 7;
 		m_url = strchr(m_url, '/');
 	}
+	if (strncasecmp(m_url, "https://", 8) == 0) {
+		m_url += 8;
+		m_url = strchr(m_url, '/');
+	}
+
 	if (!m_url || m_url[0] != '/') {
 		return BAD_REQUEST;
+	}
+	/* 设置url地址为/时的默认访问界面 */
+	if (strlen(m_url) == 1) {
+		strcat(m_url, "judge.html");
 	}
 
 	m_checkState = CHECK_STATE_HEADER;
@@ -230,16 +310,17 @@ HttpConn::HTTP_CODE HttpConn::parseHeaders(char* text)
 		m_host = text;
 	}
 	else {
-		// printf("oop! unknown header %s\n", text);
+		LOG_INFO("oop! unknown header %s\n", text);
 	}
 	return NO_REQUEST;
 }
 
-/* 我们没有真正解析HTTP请求的消息体，只是判断它是否被完整地读入了 */
 HttpConn::HTTP_CODE HttpConn::parseContent(char* text)
 {
 	if (m_readIdx >= (m_contentLength + m_checkedIdx)) {
 		text[m_contentLength] = '\0';
+		/* POST请求中消息体的内容为用户输入的用户名和密码 */
+		m_namePassword = text;
 		return GET_REQUEST;
 	}
 	return NO_REQUEST;
@@ -250,47 +331,47 @@ HttpConn::HTTP_CODE HttpConn::processRead()
 {
 	LINE_STATUS lineStatus = LINE_OK;
 	HTTP_CODE ret = NO_REQUEST;
-	char* text;
+	char* text = nullptr;
 
 	while ((m_checkState == CHECK_STATE_CONTENT && lineStatus == LINE_OK) 
 		 || (lineStatus = parseLine()) == LINE_OK) {
 		text = getLine();
 		m_startLine = m_checkedIdx;
-		printf("got 1 http line: %s\n", text);
+		LOG_INFO("%s", text);
 
 		switch (m_checkState) {
-			case CHECK_STATE_REQUESTLINE:
-			{
-				ret = parseRequestLine(text);
-				if (ret == BAD_REQUEST) {
-					return BAD_REQUEST;
-				}
-				break;
+		case CHECK_STATE_REQUESTLINE:
+		{
+			ret = parseRequestLine(text);
+			if (ret == BAD_REQUEST) {
+				return BAD_REQUEST;
 			}
-			case CHECK_STATE_HEADER:
-			{
-				ret = parseHeaders(text);
-				if (ret == BAD_REQUEST) {
-					return BAD_REQUEST;
-				}
-				else if (ret == GET_REQUEST) {
-					return doRequest();
-				}
-				break;
+			break;
+		}
+		case CHECK_STATE_HEADER:
+		{
+			ret = parseHeaders(text);
+			if (ret == BAD_REQUEST) {
+				return BAD_REQUEST;
 			}
-			case CHECK_STATE_CONTENT:
-			{
-				ret = parseContent(text);
-				if (ret == GET_REQUEST) {
-					return doRequest();
-				}
-				lineStatus = LINE_OPEN;
-				break;
+			else if (ret == GET_REQUEST) {
+				return doRequest();
 			}
-			default:
-			{
-				return INTERNAL_ERROR;
+			break;
+		}
+		case CHECK_STATE_CONTENT:
+		{
+			ret = parseContent(text);
+			if (ret == GET_REQUEST) {
+				return doRequest();
 			}
+			lineStatus = LINE_OPEN;
+			break;
+		}
+		default:
+		{
+			return INTERNAL_ERROR;
+		}
 		}
 	}
 	return NO_REQUEST;
@@ -300,9 +381,44 @@ HttpConn::HTTP_CODE HttpConn::processRead()
  * 且对所有用户可读，则使用mmap将其映射到内存地址m_fileAddress处，并返回成功 */
 HttpConn::HTTP_CODE HttpConn::doRequest()
 {
-	strcpy(m_realFile, DOC_ROOT);
-	int len = strlen(DOC_ROOT);
-	strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
+	strcpy(m_realFile, m_docRoot);
+	int len = strlen(m_docRoot);
+	
+	const char* p = strrchr(m_url, '/');
+
+	/* 处理CGI */
+	if (m_method == POST) {
+		/* 如果是POST方法，则首先从请求体内容中解析出用户名和密码 */
+		string name, password;
+		if (getNameAndPwd(name, password) == -1) {
+			return INTERNAL_ERROR;
+		}
+		if (strncasecmp(p + 1, "log.cgi", 7) == 0) {
+			CGI_UserLog(name, password);
+		}	
+		else if (strncasecmp(p + 1, "regist.cgi", 10) == 0){
+			CGI_UserRegist(name, password);
+		}
+	}
+	else if (strncasecmp(p + 1, "register", 8) == 0) {
+
+	}
+	else if (strncasecmp(p + 1, "login", 5) == 0) {
+
+	}
+	else if (strncasecmp(p + 1, "picture", 7) == 0) {
+
+	}
+	else if (strncasecmp(p + 1, "video", 5) == 0) {
+
+	}
+	else if (strncasecmp(p + 1, "fans", 4) == 0) {
+
+	}
+	else {
+		strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
+	}
+
 	if (stat(m_realFile, &m_fileStat) < 0) {
 		return NO_RESOURCE;
 	}
@@ -335,7 +451,7 @@ bool HttpConn::write()
 {
 	int temp = 0;
 	if (m_bytesToSend == 0) {
-		modfd(m_epollfd, m_sockfd, EPOLLIN);
+		modfd(m_epollfd, m_sockfd, EPOLLIN, m_mode);
 		init();
 		return true;
 	}
@@ -345,7 +461,7 @@ bool HttpConn::write()
 		if (temp <= -1) {
 			/* 如果TCP写缓冲没有空间，则等待下一轮EPOLLOUT事件 */
 			if (errno == EAGAIN) {
-				modfd(m_epollfd, m_sockfd, EPOLLOUT);
+				modfd(m_epollfd, m_sockfd, EPOLLOUT, m_mode);
 				return true;
 			}
 			unmap();
@@ -368,7 +484,7 @@ bool HttpConn::write()
 		/* 发送HTTP响应成功，根据HTTP请求中的Connection字段决定是否立即关闭连接 */
 		if (m_bytesToSend <= 0) {
 			unmap();
-			modfd(m_epollfd, m_sockfd, EPOLLIN);
+			modfd(m_epollfd, m_sockfd, EPOLLIN, m_mode);
 			if (m_linger) {
 				init();
 				return true;
@@ -391,10 +507,13 @@ bool HttpConn::addResponse(const char* format, ...)
 	int len = vsnprintf(m_writeBuf + m_writeIdx, WRITE_BUFFER_SIZE - 1 - m_writeIdx,
 				        format, argList);
 	if (len >= WRITE_BUFFER_SIZE - 1 - m_writeIdx) {
+		va_end(argList);
 		return false;
 	}
 	m_writeIdx += len;
 	va_end(argList);
+
+	LOG_INFO("request: %s", m_writeBuf);
 	return true;
 }
 
@@ -509,12 +628,56 @@ void HttpConn::process()
 {
 	HTTP_CODE readRet = processRead();
 	if (readRet == NO_REQUEST) {
-		modfd(m_epollfd, m_sockfd, EPOLLIN);
+		modfd(m_epollfd, m_sockfd, EPOLLIN, m_mode);
 		return;
 	}
 	bool writeRet = processWrite(readRet);
 	if (!writeRet) {
 		closeConn();
 	}
-	modfd(m_epollfd, m_sockfd, EPOLLOUT);
+	modfd(m_epollfd, m_sockfd, EPOLLOUT, m_mode);
+}
+
+void HttpConn::CGI_UserLog(string& name, string& password)
+{
+	if (m_users.find(name) != m_users.end() && m_users[name] == password) {
+		strcpy(m_url, "/welcome.html");
+	} else {
+		strcpy(m_url, "/logError.html");
+	}
+}
+
+void HttpConn::CGI_UserRegist(string& name, string& password)
+{
+	/* 先检测数据库中是否有重名的 */
+	/* 若没有重名的，直接插入 */
+	if (m_users.find(name) == m_users.end()) {
+		char sql[200] = { 0 };
+		sprintf(sql, "INSERT INTO user(username, passwd) VALUES('%s', '%s');", name.c_str(), password.c_str());
+		m_lock.lock();
+		int res = mysql_query(m_mysql, sql);
+		m_users[name] = password;
+		m_lock.unlock();
+		if (!res) {
+			strcpy(m_url, "/log.html");
+		}
+		else {
+			strcpy(m_url, "/registerError.html");
+		}
+	}
+	else {
+		strcpy(m_url, "/registerError.html");
+	}
+}
+
+int HttpConn::getNameAndPwd(string& name, string& password)
+{
+    // user=123&password=123
+	int i;
+	for (i = 5; m_namePassword[i] != '&'; ++i) {
+		name.push_back(m_namePassword[i]);
+	}
+	for (i = i + 10; i < m_namePassword.length(); ++i) {
+		password.push_back(m_namePassword[i]);
+	}
 }

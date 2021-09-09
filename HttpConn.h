@@ -8,19 +8,30 @@
 #ifndef _HTTP_CONN_H__
 #define _HTTP_CONN_H__
 
+#include <string>
+#include <unordered_map>
 #include "Web.h"
 #include "Locker.h"
+#include "ConnectionPool.h"
+using namespace std;
+
+struct UserInfo
+{
+	UserInfo(string name, string pwd): userName(name), password(pwd) {}
+	string userName;
+	string password;
+};
 
 class HttpConn
 {
 public:
 	/* 文件名的最大长度 */
-	static const int FILENAME_LEN = 200;
+	static constexpr int FILENAME_LEN = 200;
 	/* 读缓冲区的大小 */
-	static const int READ_BUFFER_SIZE = 2048;
+	static constexpr int READ_BUFFER_SIZE = 2048;
 	/* 写缓冲区的大小 */
-	static const int WRITE_BUFFER_SIZE = 1024;
-	/* HTTP请求方法, 但我们只支持GET */
+	static constexpr int WRITE_BUFFER_SIZE = 1024;
+	/* HTTP请求方法 */
 	enum METHOD { GET = 0, POST, HEAD, PUT, DELETE, 
 				  TRACE, OPTIONS, CONNECT, PATCH };
 	/* 解析客户请求时，主状态机所处的状态 */
@@ -40,7 +51,8 @@ public:
 
 public:
 	/* 初始化新接受的连接 */
-	void init(int sockfd, const sockaddr_in& addr);
+	void init(int sockfd, const sockaddr_in& addr, char* root, TriggerMode mode, 
+			int closeLog, string user, string password, string dbName);
 	/* 关闭连接 */
 	void closeConn(bool realClose = true);
 	/* 处理客户请求 */
@@ -49,6 +61,10 @@ public:
 	bool read();
 	/* 非阻塞写操作 */
 	bool write();
+	/* 获取客户端地址结构 */
+	sockaddr_in* getAddress();
+	/* 从数据库中预先读取出所有用户的信息 */
+	void initMysqlResult(ConnectionPool* connPool);
 
 private:
 	/* 初始化连接 */
@@ -76,11 +92,25 @@ private:
 	bool addLinger();
 	bool addBlankLine();
 
+	/* 从POST请求体中解析出提交的用户名和密码 */
+	int getNameAndPwd(string& name, string& password);
+	/* 处理不同CGI的方法 */
+	void CGI_UserLog(string& name, string& password);
+	void CGI_UserRegist(string& name, string& password);
+	
+
 public:
 	/* 所有socket上的事件都被注册到同一个epoll内核事件表中 */
 	static int m_epollfd;
 	/* 统计用户数量 */
 	static int m_userCount;
+
+	int m_timerFlag;
+	int m_improv;
+	/* 数据库连接句柄 */
+	MYSQL* m_mysql;
+	/* 读为0，写为1 */
+	int m_state;
 
 private:
 	/* 连接套接字 */
@@ -105,6 +135,8 @@ private:
 	/* 请求方法 */
 	METHOD m_method;
 
+	/* 网站的根目录 */
+	char* m_docRoot;
 	/* 客户请求的目标文件的完整路径, 相当于网站根目录 + m_url */
 	char m_realFile[FILENAME_LEN];
 	/* 客户请求的目标文件的文件名 */
@@ -117,6 +149,12 @@ private:
 	int m_contentLength;
 	/* HTTP请求是否要求保持连接 */
 	bool m_linger;
+	/* EPOLL触发模式 */
+	TriggerMode m_mode;
+	/* 是否关闭日志 */
+	int m_closeLog;
+	/* 是否启用的POST */
+	// int m_cgi;
 
 	/* 客户请求的目标文件被mmap到内存中的起始位置 */
 	char* m_fileAddress;
@@ -130,6 +168,19 @@ private:
 	size_t m_bytesToSend;
 	/* 已经从缓冲区中发送的字节数 */
 	size_t m_bytesHaveSend;
+
+	/* 数据库用户名 */
+	char* m_dbUser;
+	/* 数据库密码 */
+	char* m_dbPassword;
+	/* 数据库名称 */
+	char* m_dbName;
+	/* 记录用户名和密码 */	
+	static unordered_map<string, string> m_users;
+	/* 锁 */
+	static Locker m_lock;
+	/* 临时保存POST请求中消息体的内容（用户名和密码）*/
+	string m_namePassword;
 };
 
 #endif
