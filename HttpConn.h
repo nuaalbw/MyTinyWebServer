@@ -97,6 +97,7 @@ private:
 	/* 处理不同CGI的方法 */
 	void CGI_UserLog(string& name, string& password);
 	void CGI_UserRegist(string& name, string& password);
+	void setReturnPage(char* str);
 	
 
 public:
@@ -170,15 +171,11 @@ private:
 	size_t m_bytesHaveSend;
 
 	/* 数据库用户名 */
-	char* m_dbUser;
+	char m_dbUser[100];
 	/* 数据库密码 */
-	char* m_dbPassword;
+	char m_dbPassword[100];
 	/* 数据库名称 */
-	char* m_dbName;
-	/* 记录用户名和密码 */	
-	static unordered_map<string, string> m_users;
-	/* 锁 */
-	static Locker m_lock;
+	char m_dbName[100];
 	/* 临时保存POST请求中消息体的内容（用户名和密码）*/
 	string m_namePassword;
 };

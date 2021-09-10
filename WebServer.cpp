@@ -113,6 +113,10 @@ void WebServer::eventListen()
 		setsockopt(m_listenfd, SOL_SOCKET, SO_LINGER, &tmp, sizeof(tmp));
 	}
 
+	/* 如下两行是为了避免TIME_WAIT状态，仅用于调试，实际使用时应去掉 */
+	int reuse = 1;
+	setsockopt(m_listenfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+
 	/* 准备地址结构 */
 	struct sockaddr_in address;
 	bzero(&address, sizeof(address));

@@ -82,7 +82,7 @@ void Utils::timerHandler()
 	alarm(m_timeslot);	
 }
 
-void showError(int connfd, const char* info)
+void Utils::showError(int connfd, const char* info)
 {
 	send(connfd, info, strlen(info), 0);
 	close(connfd);

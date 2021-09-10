@@ -38,6 +38,6 @@ typedef void Sigfunc(int);
 #define MAXLINE		1024
 
 enum TriggerMode { EPOLL_LT = 1, EPOLL_ET };
-enum ActorModel { REACTOR = 1, PREACTOR };
+enum ActorModel { REACTOR = 1, PROACTOR };
 
 #endif

@@ -19,6 +19,11 @@ const char* ERROR_404_FORM = "The requested file was not found on this server.\n
 const char* ERROR_500_TITLE = "Internal Error";
 const char* ERROR_500_FORM = "There was an unusual problem serving the requested file.\n";
 
+/* 记录用户名和密码 */
+static unordered_map<string, string> m_users;
+/* 锁 */
+static Locker m_lock;
+
 /* 将文件描述符设置为非阻塞 */
 static int setNonblocking(int fd)
 {
@@ -86,10 +91,6 @@ void HttpConn::init(int sockfd, const sockaddr_in& addr, char* root, TriggerMode
 {
 	m_sockfd = sockfd;
 	m_address = addr;
-
-	/* 如下两行是为了避免TIME_WAIT状态，仅用于调试，实际使用时应去掉 */
-	int reuse = 1;
-	setsockopt(m_sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 
 	addfd(m_epollfd, sockfd, true, mode);
 	m_userCount++;
@@ -400,20 +401,12 @@ HttpConn::HTTP_CODE HttpConn::doRequest()
 			CGI_UserRegist(name, password);
 		}
 	}
-	else if (strncasecmp(p + 1, "register", 8) == 0) {
 
+	if (strncasecmp(p + 1, "register", 8) == 0) {
+		setReturnPage("/register.html");
 	}
 	else if (strncasecmp(p + 1, "login", 5) == 0) {
-
-	}
-	else if (strncasecmp(p + 1, "picture", 7) == 0) {
-
-	}
-	else if (strncasecmp(p + 1, "video", 5) == 0) {
-
-	}
-	else if (strncasecmp(p + 1, "fans", 4) == 0) {
-
+		setReturnPage("/log.html");
 	}
 	else {
 		strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
@@ -680,4 +673,12 @@ int HttpConn::getNameAndPwd(string& name, string& password)
 	for (i = i + 10; i < m_namePassword.length(); ++i) {
 		password.push_back(m_namePassword[i]);
 	}
+}
+
+void HttpConn::setReturnPage(char* str)
+{
+	int len = strlen(m_docRoot);
+	char m_urlReal[200] = { 0 };
+	strcpy(m_urlReal, str);
+	strncpy(m_realFile + len, m_urlReal, strlen(m_urlReal));
 }
