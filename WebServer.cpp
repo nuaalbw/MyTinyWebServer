@@ -92,7 +92,7 @@ void WebServer::trigMode()
 		m_lfdMode = EPOLL_ET;
 		m_cfdMode = EPOLL_LT;
 	}
-	else if (m_triggerMode = 3) {
+	else if (m_triggerMode == 3) {
 		m_lfdMode = EPOLL_ET;
 		m_cfdMode = EPOLL_ET;
 	}
@@ -135,7 +135,6 @@ void WebServer::eventListen()
 	m_utils.init(TIMESLOT);
 
 	/* 创建epoll内核事件表 */
-	epoll_event events[MAX_EVENT_NUMBER];
 	m_epollfd = epoll_create(5);
 	assert(m_epollfd != -1);
 	/*向epoll内核事件表注册监听文件描述符 */
@@ -198,7 +197,7 @@ void WebServer::eventLoop()
 				dealWithRead(sockfd);
 			}
 			/* 处理连接文件描述符上的写事件 */
-			else if (events[i].events * EPOLLOUT) {
+			else if (events[i].events & EPOLLOUT) {
 				dealWithWrite(sockfd);
 			}
 		}
@@ -285,7 +284,6 @@ bool WebServer::dealClientData()
 bool WebServer::dealWithSignal(bool &timeout, bool &stopServer)
 {
 	int ret = 0;
-	int sig;
 	char signals[1024];
 	/* 从管道中接收信号 */
 	ret = recv(m_pipefd[0], signals, sizeof(signals), 0);

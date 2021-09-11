@@ -16,9 +16,9 @@
 using namespace std;
 
 /* 最大文件描述符数量 */
-static constexpr int MAX_FD = 6000;
+static constexpr int MAX_FD = 10000;
 /* 最大事件数 */
-static constexpr int MAX_EVENT_NUMBER = 1000;
+static constexpr int MAX_EVENT_NUMBER = 10000;
 /* 最小超时单位 */
 static constexpr int TIMESLOT = 5;
 

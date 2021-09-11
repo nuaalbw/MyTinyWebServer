@@ -149,10 +149,6 @@ void HttpConn::initMysqlResult(ConnectionPool* connPool)
 	}
 	/* 从表中检索完整的结果集 */
 	MYSQL_RES* result = mysql_store_result(mysql);
-	/* 返回结果集中的列数 */
-	int numFields = mysql_num_fields(result);
-	/* 返回所有字段结构的数组 */
-	MYSQL_FIELD* fields = mysql_fetch_fields(result);
 	/* 利用哈希表记录下所有客户的用户名和密码 */
 	while (MYSQL_ROW row = mysql_fetch_row(result)) {
 		string name(row[0]);
@@ -311,7 +307,7 @@ HttpConn::HTTP_CODE HttpConn::parseHeaders(char* text)
 		m_host = text;
 	}
 	else {
-		LOG_INFO("oop! unknown header %s\n", text);
+		// LOG_INFO("oop! unknown header %s\n", text);
 	}
 	return NO_REQUEST;
 }
@@ -401,16 +397,8 @@ HttpConn::HTTP_CODE HttpConn::doRequest()
 			CGI_UserRegist(name, password);
 		}
 	}
+	strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
 
-	if (strncasecmp(p + 1, "register", 8) == 0) {
-		setReturnPage("/register.html");
-	}
-	else if (strncasecmp(p + 1, "login", 5) == 0) {
-		setReturnPage("/log.html");
-	}
-	else {
-		strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
-	}
 
 	if (stat(m_realFile, &m_fileStat) < 0) {
 		return NO_RESOURCE;
@@ -635,7 +623,8 @@ void HttpConn::CGI_UserLog(string& name, string& password)
 {
 	if (m_users.find(name) != m_users.end() && m_users[name] == password) {
 		strcpy(m_url, "/welcome.html");
-	} else {
+	}
+	else {
 		strcpy(m_url, "/logError.html");
 	}
 }
@@ -655,11 +644,11 @@ void HttpConn::CGI_UserRegist(string& name, string& password)
 			strcpy(m_url, "/log.html");
 		}
 		else {
-			strcpy(m_url, "/registerError.html");
+			strcpy(m_url, "/registError.html");
 		}
 	}
 	else {
-		strcpy(m_url, "/registerError.html");
+		strcpy(m_url, "/registError.html");
 	}
 }
 
@@ -673,9 +662,10 @@ int HttpConn::getNameAndPwd(string& name, string& password)
 	for (i = i + 10; i < m_namePassword.length(); ++i) {
 		password.push_back(m_namePassword[i]);
 	}
+	return true;
 }
 
-void HttpConn::setReturnPage(char* str)
+void HttpConn::setReturnPage(const char* str)
 {
 	int len = strlen(m_docRoot);
 	char m_urlReal[200] = { 0 };

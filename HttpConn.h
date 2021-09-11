@@ -97,7 +97,7 @@ private:
 	/* 处理不同CGI的方法 */
 	void CGI_UserLog(string& name, string& password);
 	void CGI_UserRegist(string& name, string& password);
-	void setReturnPage(char* str);
+	void setReturnPage(const char* str);
 	
 
 public:

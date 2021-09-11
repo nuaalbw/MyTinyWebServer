@@ -1,27 +1,26 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <meta charset="UTF-8">
-        <title>WebServer</title>
-    </head>
-    <body>
-    <br/>
-    <br/>
-    <div align="center"><font size="5"> <strong>是时候做出选择了</strong></font></div>
-	<br/>
-		<br/>
-		<form action="/picture.html" method="post">
- 			<div align="center"><button type="submit">听音乐</button></div>
-                </form>
-		<br/>
-                <form action="/video.html" method="post">
-                        <div align="center"><button type="submit" >xxx.avi</button></div>
-                </form>
-		<br/>
-		<form action="/fans.html" method="post">
- 			<div align="center"><button type="submit">关注我</button></div>
-                </form>
-		
-        </div>
-    </body>
+
+<head>
+    <meta charset="UTF-8">
+    <title>MyTinyWebServer</title>
+    <link rel="stylesheet" type="text/css" href="log.css" />
+</head>
+
+<body>
+    <div id="login">
+        <h1>Make Choice</h1>
+        <form action="/picture.html" method="POST">
+            <button class="but" type="submit">看图片</button>
+        </form>
+        <br />
+        <form action="/video.html" method="POST">
+            <button class="but1" type="submit">看视频</button>
+        </form>
+        <br />
+        <form action="/fans.html" method="POST">
+            <button class="but2" type="submit">关注我</button>
+        </form>
+    </div>
+</body>
+
 </html>

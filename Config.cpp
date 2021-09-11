@@ -15,8 +15,8 @@ Config::Config()
 	port = 8888;
 	/* 日志写入方式，默认同步 */
 	logWrite = 0;
-	/* 触发组合模式，默认listenfd LT + connfd LT */
-	triggerMode = 0;
+	/* 触发组合模式，默认listenfd ET + connfd ET */
+	triggerMode = 3;
 	/* listenfd 触发模式，默认为LT */
 	lfdMode = EPOLL_LT;
 	/* connfd 触发模式，默认为LT */
@@ -28,7 +28,7 @@ Config::Config()
 	/* 线程池内的线程数量，默认为8 */
 	threadNum = 8;
 	/* 关闭日志，默认不关闭 */
-	closeLog = 0;
+	closeLog = 1;
 	/* 服务器并发模型，默认为proactor */
 	model = PROACTOR;
 }

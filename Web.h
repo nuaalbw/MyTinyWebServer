@@ -31,12 +31,6 @@
 #include <netdb.h>
 #include <stdarg.h>
 
-typedef void Sigfunc(int);
-
-#define SERV_PORT	"9999"
-#define LISTENQ		20	
-#define MAXLINE		1024
-
 enum TriggerMode { EPOLL_LT = 1, EPOLL_ET };
 enum ActorModel { REACTOR = 1, PROACTOR };
 

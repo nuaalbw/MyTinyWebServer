@@ -24,6 +24,7 @@ public:
 	~Threadpool();
 	/* 向请求队列中添加任务 */
 	bool append(T* request, int state);
+	/* proactor模式下添加任务 */
 	bool append_p(T* requrst);
 
 private:

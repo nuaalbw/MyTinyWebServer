@@ -71,16 +71,16 @@ bool Log::init(const char* fileName, int closeLog, int logBufSize, int splitLine
 
 	/* 指针p指向'/'最后一次出现的位置 */
 	const char* p = strrchr(fileName, '/');
-	char logFullName[256] = { 0 };
+	char logFullName[301] = { 0 };
 
 	if (p == nullptr) {
-		snprintf(logFullName, 255, "%d_%02d_%02d_%s", myTm.tm_year + 1900, 
+		snprintf(logFullName, 300, "%d_%02d_%02d_%s", myTm.tm_year + 1900, 
 				myTm.tm_mon + 1, myTm.tm_mday, fileName);
 	}
 	else {
 		strcpy(m_logName, p + 1);
 		strncpy(m_dirName, fileName, p - fileName + 1);
-		snprintf(logFullName, 255, "%s%d_%02d_%02d_%s", m_dirName, myTm.tm_year + 1900, 
+		snprintf(logFullName, 300, "%s%d_%02d_%02d_%s", m_dirName, myTm.tm_year + 1900, 
 				myTm.tm_mon + 1, myTm.tm_mday, m_logName);	
 	}
 	m_today = myTm.tm_mday;
@@ -125,18 +125,18 @@ void Log::writeLog(Level level, const char* format, ...)
 	m_count++;
 	/* 若到了新的一天或当前行数超过了最大行数，则将日志打印在新的文件中 */
 	if (m_today != myTm.tm_mday || m_count % m_spiltLines == 0) {
-		char newLog[256] = { 0 };
+		char newLog[301] = { 0 };
 		fflush(m_fp);
 		fclose(m_fp);
 		char tail[16] = { 0 };
 		snprintf(tail, 16, "%d_%02d_%02d_", myTm.tm_year + 1900, myTm.tm_mon + 1, myTm.tm_mday);
 		if (m_today != myTm.tm_mday) {
-			snprintf(newLog, 255, "%s%s%s", m_dirName, tail, m_logName);
+			snprintf(newLog, 300, "%s%s%s", m_dirName, tail, m_logName);
 			m_today = myTm.tm_mday;
 			m_count = 0;
 		}
 		else {
-			snprintf(newLog, 255, "%s%s%s.%lld", m_dirName, tail, m_logName, m_count / m_spiltLines);
+			snprintf(newLog, 300, "%s%s%s.%lld", m_dirName, tail, m_logName, m_count / m_spiltLines);
 		}
 		m_fp = fopen(newLog, "a");
 	}
