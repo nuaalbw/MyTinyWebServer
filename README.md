@@ -4,16 +4,10 @@ MyTinyWebServer
 
 * 使用 **线程池 + 非阻塞socket + epoll(ET和LT均实现) + 事件处理(Reactor和模拟Proactor均实现)** 的并发模型
 * 使用**状态机**解析HTTP请求报文，支持解析**GET和POST**请求
-* 访问服务器数据库实现web端用户**注册、登录**功能，可以请求服务器**图片和视频文件**
-* 实现**同步/异步日志系统**，记录服务器运行状态
+* 使用**连接池**对数据库进行访问，支持web端用户的**注册**和**登录**功能
+* 使用CGI生成动态html文件，支持web端用户对**图片、视频和音乐资源**的请求功能
+* 使用单例模式实现**同步/异步日志系统**，记录服务器运行状态
 * 经Webbench压力测试可以实现**上万的并发连接**数据交换
-
-目录
------
-
-| [概述](#概述) | [框架](#框架) | [Demo演示](#Demo演示) | [压力测试](#压力测试) |[更新日志](#更新日志) |[源码下载](#源码下载) | [快速运行](#快速运行) | [个性化运行](#个性化运行) | [庖丁解牛](#庖丁解牛) | [CPP11实现](#CPP11实现) |[致谢](#致谢) |
-|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|:--------:|
-
 
 概述
 ----------
@@ -100,23 +94,11 @@ Demo演示
 - [x] 改进编译方式，只配置一次SQL信息即可
 - [x] 新增Reactor模式，并完成压力测试
 
-源码下载
--------
-目前有两个版本，版本间的代码结构有较大改动，文档和代码运行方法也不一致。重构版本更简洁，原始版本(raw_version)更大保留游双代码的原汁原味，从原始版本更容易入手.
-
-如果遇到github代码下载失败，或访问太慢，可以从以下链接下载，与Github最新提交同步.
-
-* 重构版本下载地址 : [BaiduYun](https://pan.baidu.com/s/1PozKji8Oop-1BYcfixZR0g)
-    *  提取码 : vsqq
-* 原始版本(raw_version)下载地址 : [BaiduYun](https://pan.baidu.com/s/1asMNDW-zog92DZY1Oa4kaQ)
-    * 提取码 : 9wye
-    * 原始版本运行请参考[原始文档](https://github.com/qinguoyi/TinyWebServer/tree/raw_version)
-
 快速运行
 ------------
 * 服务器测试环境
-	* Ubuntu版本16.04
-	* MySQL版本5.7.29
+	* CentOS版本7.9.2009
+	* MySQL版本8.0.26
 * 浏览器测试环境
 	* Windows、Linux均可
 	* Chrome
@@ -152,7 +134,7 @@ Demo演示
 * build
 
     ```C++
-    sh ./build.sh
+    make 
     ```
 
 * 启动server
@@ -164,7 +146,7 @@ Demo演示
 * 浏览器端
 
     ```C++
-    ip:9006
+    ip:8888
     ```
 
 个性化运行
@@ -177,11 +159,11 @@ Demo演示
 温馨提示:以上参数不是非必须，不用全部使用，根据个人情况搭配选用即可.
 
 * -p，自定义端口号
-	* 默认9006
+	* 默认8888
 * -l，选择日志写入方式，默认同步写入
 	* 0，同步写入
 	* 1，异步写入
-* -m，listenfd和connfd的模式组合，默认使用LT + LT
+* -m，listenfd和connfd的模式组合，默认使用ET + ET
 	* 0，表示使用LT + LT
 	* 1，表示使用LT + ET
     * 2，表示使用ET + LT
@@ -193,7 +175,7 @@ Demo演示
 	* 默认为8
 * -t，线程数量
 	* 默认为8
-* -c，关闭日志，默认打开
+* -c，关闭日志，默认关闭
 	* 0，打开日志
 	* 1，关闭日志
 * -a，选择反应堆模型，默认Proactor
@@ -214,33 +196,3 @@ Demo演示
 - [x] 线程池内有10条线程
 - [x] 关闭日志
 - [x] Reactor反应堆模型
-
-庖丁解牛
-------------
-近期版本迭代较快，以下内容多以旧版本(raw_version)代码为蓝本进行详解.
-
-* [小白视角：一文读懂社长的TinyWebServer](https://huixxi.github.io/2020/06/02/%E5%B0%8F%E7%99%BD%E8%A7%86%E8%A7%92%EF%BC%9A%E4%B8%80%E6%96%87%E8%AF%BB%E6%87%82%E7%A4%BE%E9%95%BF%E7%9A%84TinyWebServer/#more)
-* [最新版Web服务器项目详解 - 01 线程同步机制封装类](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274278&idx=3&sn=5840ff698e3f963c7855d702e842ec47&chksm=83ffbefeb48837e86fed9754986bca6db364a6fe2e2923549a378e8e5dec6e3cf732cdb198e2&scene=0&xtrack=1#rd)
-* [最新版Web服务器项目详解 - 02 半同步半反应堆线程池（上）](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274278&idx=4&sn=caa323faf0c51d882453c0e0c6a62282&chksm=83ffbefeb48837e841a6dbff292217475d9075e91cbe14042ad6e55b87437dcd01e6d9219e7d&scene=0&xtrack=1#rd)
-* [最新版Web服务器项目详解 - 03 半同步半反应堆线程池（下）](https://mp.weixin.qq.com/s/PB8vMwi8sB4Jw3WzAKpWOQ)
-* [最新版Web服务器项目详解 - 04 http连接处理（上）](https://mp.weixin.qq.com/s/BfnNl-3jc_x5WPrWEJGdzQ)
-* [最新版Web服务器项目详解 - 05 http连接处理（中）](https://mp.weixin.qq.com/s/wAQHU-QZiRt1VACMZZjNlw)
-* [最新版Web服务器项目详解 - 06 http连接处理（下）](https://mp.weixin.qq.com/s/451xNaSFHxcxfKlPBV3OCg)
-* [最新版Web服务器项目详解 - 07 定时器处理非活动连接（上）](https://mp.weixin.qq.com/s/mmXLqh_NywhBXJvI45hchA)
-* [最新版Web服务器项目详解 - 08 定时器处理非活动连接（下）](https://mp.weixin.qq.com/s/fb_OUnlV1SGuOUdrGrzVgg)
-* [最新版Web服务器项目详解 - 09 日志系统（上）](https://mp.weixin.qq.com/s/IWAlPzVDkR2ZRI5iirEfCg)
-* [最新版Web服务器项目详解 - 10 日志系统（下）](https://mp.weixin.qq.com/s/f-ujwFyCe1LZa3EB561ehA)
-* [最新版Web服务器项目详解 - 11 数据库连接池](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274326&idx=1&sn=5af78e2bf6552c46ae9ab2aa22faf839&chksm=83ffbe8eb4883798c3abb82ddd124c8100a39ef41ab8d04abe42d344067d5e1ac1b0cac9d9a3&token=1450918099&lang=zh_CN#rd)
-* [最新版Web服务器项目详解 - 12 注册登录](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274431&idx=4&sn=7595a70f06a79cb7abaebcd939e0cbee&chksm=83ffb167b4883871ce110aeb23e04acf835ef41016517247263a2c3ab6f8e615607858127ea6&token=1686112912&lang=zh_CN#rd)
-* [最新版Web服务器项目详解 - 13 踩坑与面试题](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274431&idx=1&sn=2dd28c92f5d9704a57c001a3d2630b69&chksm=83ffb167b48838715810b27b8f8b9a576023ee5c08a8e5d91df5baf396732de51268d1bf2a4e&token=1686112912&lang=zh_CN#rd)
-* 已更新完毕
-
-CPP11实现
-------------
-更简洁，更优雅的CPP11实现：[Webserver](https://github.com/markparticle/WebServer)
-
-致谢
-------------
-Linux高性能服务器编程，游双著.
-
-感谢以下朋友的PR和帮助: [@RownH](https://github.com/RownH)，[@mapleFU](https://github.com/mapleFU)，[@ZWiley](https://github.com/ZWiley)，[@zjuHong](https://github.com/zjuHong)，[@mamil](https://github.com/mamil)，[@byfate](https://github.com/byfate)，[@MaJun827](https://github.com/MaJun827)，[@BBLiu-coder](https://github.com/BBLiu-coder)，[@smoky96](https://github.com/smoky96)，[@yfBong](https://github.com/yfBong)，[@liuwuyao](https://github.com/liuwuyao)，[@Huixxi](https://github.com/Huixxi)，[@markparticle](https://github.com/markparticle).
