@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <stdarg.h>
+#include <dirent.h>
 
 enum TriggerMode { EPOLL_LT = 1, EPOLL_ET };
 enum ActorModel { REACTOR = 1, PROACTOR };

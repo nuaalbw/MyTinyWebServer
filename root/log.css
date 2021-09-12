@@ -85,3 +85,17 @@ input{
     border-radius: 5px;   
     margin: 0;   
 }
+
+.but3{   
+    width: 300px;   
+    min-height: 20px;   
+    display: block;   
+    background-color: #d1bd0b;   
+    border: 1px solid #c9a817;   
+    color: #fff;   
+    padding: 9px 14px;   
+    font-size: 17px;   
+    line-height: normal;   
+    border-radius: 5px;   
+    margin: 0;   
+}

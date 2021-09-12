@@ -58,9 +58,9 @@ public:
 	/* 处理客户请求 */
 	void process();
 	/* 非阻塞读操作 */
-	bool read();
+	bool readn();
 	/* 非阻塞写操作 */
-	bool write();
+	bool writen();
 	/* 获取客户端地址结构 */
 	sockaddr_in* getAddress();
 	/* 从数据库中预先读取出所有用户的信息 */
@@ -95,9 +95,9 @@ private:
 	/* 从POST请求体中解析出提交的用户名和密码 */
 	int getNameAndPwd(string& name, string& password);
 	/* 处理不同CGI的方法 */
-	void CGI_UserLog(string& name, string& password);
-	void CGI_UserRegist(string& name, string& password);
-	void setReturnPage(const char* str);
+	void CGI_UserLog();
+	void CGI_UserRegist();
+	void CGI_MusicList();
 	
 
 public:

@@ -186,7 +186,7 @@ HttpConn::LINE_STATUS HttpConn::parseLine()
 }
 
 /* 循环读取客户数据, 直到无数据可读或者对方关闭连接 */
-bool HttpConn::read()
+bool HttpConn::readn()
 {
 	if (m_readIdx >= READ_BUFFER_SIZE) {
 		return false;
@@ -385,20 +385,17 @@ HttpConn::HTTP_CODE HttpConn::doRequest()
 
 	/* 处理CGI */
 	if (m_method == POST) {
-		/* 如果是POST方法，则首先从请求体内容中解析出用户名和密码 */
-		string name, password;
-		if (getNameAndPwd(name, password) == -1) {
-			return INTERNAL_ERROR;
-		}
 		if (strncasecmp(p + 1, "log.cgi", 7) == 0) {
-			CGI_UserLog(name, password);
+			CGI_UserLog();
 		}	
 		else if (strncasecmp(p + 1, "regist.cgi", 10) == 0){
-			CGI_UserRegist(name, password);
+			CGI_UserRegist();
+		}
+		else if (strncasecmp(p + 1, "musiclist.cgi", 13) == 0) {
+			CGI_MusicList();
 		}
 	}
 	strncpy(m_realFile + len, m_url, FILENAME_LEN - len - 1);
-
 
 	if (stat(m_realFile, &m_fileStat) < 0) {
 		return NO_RESOURCE;
@@ -428,7 +425,7 @@ void HttpConn::unmap()
 }
 
 /* 写HTTP响应 */
-bool HttpConn::write()
+bool HttpConn::writen()
 {
 	int temp = 0;
 	if (m_bytesToSend == 0) {
@@ -619,8 +616,11 @@ void HttpConn::process()
 	modfd(m_epollfd, m_sockfd, EPOLLOUT, m_mode);
 }
 
-void HttpConn::CGI_UserLog(string& name, string& password)
+void HttpConn::CGI_UserLog()
 {
+	/* 首先从请求体内容中解析出用户名和密码 */
+	string name, password;
+	getNameAndPwd(name, password);
 	if (m_users.find(name) != m_users.end() && m_users[name] == password) {
 		strcpy(m_url, "/welcome.html");
 	}
@@ -629,8 +629,11 @@ void HttpConn::CGI_UserLog(string& name, string& password)
 	}
 }
 
-void HttpConn::CGI_UserRegist(string& name, string& password)
+void HttpConn::CGI_UserRegist()
 {
+	/* 首先从请求体内容中解析出用户名和密码 */
+	string name, password;
+	getNameAndPwd(name, password);
 	/* 先检测数据库中是否有重名的 */
 	/* 若没有重名的，直接插入 */
 	if (m_users.find(name) == m_users.end()) {
@@ -665,10 +668,67 @@ int HttpConn::getNameAndPwd(string& name, string& password)
 	return true;
 }
 
-void HttpConn::setReturnPage(const char* str)
+void HttpConn::CGI_MusicList()
 {
-	int len = strlen(m_docRoot);
-	char m_urlReal[200] = { 0 };
-	strcpy(m_urlReal, str);
-	strncpy(m_realFile + len, m_urlReal, strlen(m_urlReal));
+	char tempBuf[BUFSIZ] = { 0 };
+	int len = 0;
+	/* 读取html文件头部 */
+	int fd = open("root/dir_header.html", O_RDONLY);
+	if (fd == -1) {
+		LOG_ERROR("CGI_MusicList open error, errno is %d", errno);
+		return;
+	}
+	size_t headerLen = read(fd, tempBuf, sizeof(tempBuf));
+	if (headerLen == -1) {
+		LOG_ERROR("CGI_MusicList read error, errno is %d", errno);
+		return;
+	}
+	close(fd);
+	len += headerLen;
+
+	/* 查询music文件夹下的所有信息 */
+	struct dirent** nameList;
+	int num = scandir("root/music", &nameList, nullptr, alphasort);
+	if (num < 0) {
+		LOG_ERROR("CGI_MusicList scandir error, errno is %d", errno);
+		return;
+	}
+	/* 将music文件夹下的所有文件连接写入缓冲区中 */
+	while (num--) {
+		if (nameList[num]->d_name[0] == '.') {
+			continue;
+		}
+		int n = snprintf(tempBuf + len, BUFSIZ - len, "<li><a href=music/%s>%s</a></li>\n", nameList[num]->d_name, nameList[num]->d_name);
+		len += n;
+		free(nameList[num]);
+	}
+	free(nameList);
+
+	/* 读取html文件尾部 */
+	fd = open("root/dir_tail.html", O_RDONLY);
+	if (fd == -1) {
+		LOG_ERROR("CGI_MusicList open error, errno is %d", errno);
+		return;
+	}
+	size_t tailLen = read(fd, tempBuf + len, sizeof(tempBuf) - len);
+	if (tailLen == -1) {
+		LOG_ERROR("CGI_MusicList read error, errno is %d", errno);
+		return;
+	}
+	close(fd);
+	len += tailLen;
+	/* 生成动态html文件 */
+	FILE* fp = fopen("root/musiclist.html", "w+");
+	if (fp == nullptr) {
+		LOG_ERROR("CGI_MusicList open error, errno is %d", errno);
+		return;
+	}
+	int ret = fputs(tempBuf, fp);
+	if (ret == EOF) {
+		LOG_ERROR("CGI_MusicList open error, errno is %d", errno);
+		return;
+	}
+	fflush(fp);
+	fclose(fp);
+	strcpy(m_url, "/musiclist.html");
 }

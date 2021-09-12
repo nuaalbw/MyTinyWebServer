@@ -148,7 +148,7 @@ void Threadpool<T>::run()
 		}
 		if (m_model == REACTOR) {
 			if (request->m_state == 0) {
-				if (request->read()) {
+				if (request->readn()) {
 					request->m_improv = 1;
 					ConnectionRAII mysqlConn(&request->m_mysql, m_connPool);
 					request->process();
@@ -159,7 +159,7 @@ void Threadpool<T>::run()
 				}
 			}
 			else {
-				if (request->write()) {
+				if (request->writen()) {
 					request->m_improv = 1;
 				}
 				else {

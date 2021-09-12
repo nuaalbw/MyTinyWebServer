@@ -50,6 +50,7 @@ void WebServer::init(int port, string dbUser, string dbPwd, string dbName,
 	m_logWrite = logWrite;
 	m_optLinger = optLinger;
 	m_triggerMode = triggerMode;
+	m_closeLog = closeLog;
 }
 
 void WebServer::threadPoolInit()
@@ -330,7 +331,7 @@ void WebServer::dealWithRead(int sockfd)
 	}
 	/* proactor模式下，由主线程负责处理I/O操作，工作线程负责处理业务逻辑 */
 	else {
-		if (m_users[sockfd].read()) {
+		if (m_users[sockfd].readn()) {
 			LOG_INFO("deal with the client(%s)", inet_ntoa(m_users[sockfd].getAddress()->sin_addr));
 			m_pool->append_p(m_users + sockfd);
 			if (timer) {
@@ -363,7 +364,7 @@ void WebServer::dealWithWrite(int sockfd)
 		}
 	}
 	else {
-		if (m_users[sockfd].write()) {
+		if (m_users[sockfd].writen()) {
 			LOG_INFO("send data to the client(%s)", inet_ntoa(m_users[sockfd].getAddress()->sin_addr));
 			if (timer) {
 				adjustTimer(timer);

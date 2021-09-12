@@ -27,7 +27,7 @@ Config::Config()
 	sqlNum = 8;
 	/* 线程池内的线程数量，默认为8 */
 	threadNum = 8;
-	/* 关闭日志，默认不关闭 */
+	/* 关闭日志，默认关闭 */
 	closeLog = 1;
 	/* 服务器并发模型，默认为proactor */
 	model = PROACTOR;
