@@ -22,6 +22,9 @@ int main(int argc, char* argv[])
 
 	/* 服务器初始化 */
 	WebServer server;
+	/* 进入守护进程 */
+	server.initDaemon();
+
 	server.init(config.port, dbUser, dbPassword, dbName, config.logWrite, config.optLinger, config.triggerMode, 
 				config.sqlNum, config.threadNum, config.closeLog, config.model);
 

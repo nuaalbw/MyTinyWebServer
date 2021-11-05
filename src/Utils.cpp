@@ -78,7 +78,7 @@ void Utils::addSig(int sig, void(handler)(int), bool restart)
 
 void Utils::timerHandler()
 {
-	m_timerList.tick();
+	m_timeHeap.tick();
 	alarm(m_timeslot);	
 }
 

@@ -9,7 +9,8 @@
 #define _UTILS_H__
 
 #include <iostream>
-#include "TimerList.h"
+#include "HeapTimer.h"
+#include "Web.h"
 using namespace std;
 
 class Utils
@@ -34,7 +35,7 @@ public:
 
 public:
 	static int* u_pipefd;
-	SortTimerList m_timerList;
+	TimeHeap m_timeHeap;
 	static int u_epollfd;
 	int m_timeslot;
 };

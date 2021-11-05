@@ -47,9 +47,9 @@ public:
 	/* 初始化定时器 */
 	void initTimer(int connfd, sockaddr_in clientAddress);
 	/* 调整定时器 */
-	void adjustTimer(UtilTimer* timer);
+	void adjustTimer(HeapTimer* timer);
 	/* 处理定时器事件 */
-	void dealTimer(UtilTimer* timer, int sockfd);
+	void dealTimer(HeapTimer* timer, int sockfd);
 	/* 处理客户端数据 */
 	bool dealClientData();
 	/* 处理信号事件 */
@@ -58,6 +58,8 @@ public:
 	void dealWithRead(int sockfd);
 	/* 处理写事件 */
 	void dealWithWrite(int sockfd);
+	/* 设置守护进程 */
+	int initDaemon();
 
 public:
 	int m_port;

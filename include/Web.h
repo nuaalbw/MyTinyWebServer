@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/uio.h>
+#include <sys/param.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <signal.h>

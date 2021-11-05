@@ -25,6 +25,7 @@ WebServer::WebServer()
 	/* 初始化定时器 */
 	m_usersTimer = new ClientData[MAX_FD];
 }
+
 WebServer::~WebServer()
 {
 	free(m_root);
@@ -183,7 +184,7 @@ void WebServer::eventLoop()
 			/* 处理异常事件 */
 			else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR)) {
 				/* 服务器端关闭连接，移除对应的定时器 */
-				UtilTimer* timer = m_usersTimer[sockfd].timer;
+				HeapTimer* timer = m_usersTimer[sockfd].timer;
 				dealTimer(timer, sockfd);
 			}
 			/* 处理信号事件 */
@@ -216,28 +217,26 @@ void WebServer::initTimer(int connfd, sockaddr_in clientAddress)
 	/* 创建定时器，设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中 */
 	m_usersTimer[connfd].address = clientAddress;
 	m_usersTimer[connfd].sockfd = connfd;
-	UtilTimer* timer = new UtilTimer;
+	HeapTimer* timer = new HeapTimer(3 * TIMESLOT);
 	timer->userData = &m_usersTimer[connfd];
 	timer->cbFunc = cbFunc;
-	time_t cur = time(nullptr);
-	timer->expire = cur + 3 * TIMESLOT;
 	m_usersTimer[connfd].timer = timer;
-	m_utils.m_timerList.addTimer(timer);
+	m_utils.m_timeHeap.addTimer(timer);
 }
 
-void WebServer::adjustTimer(UtilTimer *timer)
+void WebServer::adjustTimer(HeapTimer *timer)
 {
 	time_t cur = time(nullptr);
 	timer->expire = cur + 3 * TIMESLOT;
-	m_utils.m_timerList.adjustTimer(timer);
+	m_utils.m_timeHeap.adjustTimer(timer);
 	LOG_INFO("%s", "adjust timer once");
 }
 
-void WebServer::dealTimer(UtilTimer *timer, int sockfd)
+void WebServer::dealTimer(HeapTimer *timer, int sockfd)
 {
 	timer->cbFunc(&m_usersTimer[sockfd]);
 	if (timer) {
-		m_utils.m_timerList.deleteTimer(timer);
+		m_utils.m_timeHeap.delTimer(timer);
 	}
 	LOG_INFO("close fd %d", m_usersTimer[sockfd].sockfd);
 }
@@ -309,7 +308,7 @@ bool WebServer::dealWithSignal(bool &timeout, bool &stopServer)
 
 void WebServer::dealWithRead(int sockfd)
 {
-	UtilTimer* timer = m_usersTimer[sockfd].timer;
+	HeapTimer* timer = m_usersTimer[sockfd].timer;
 	/* reactor模式下，主线程只需接收新连接，读写数据由工作线程负责 */
 	if (m_actormodel == REACTOR) {
 		/* 更新定时器超时时间 */
@@ -346,7 +345,7 @@ void WebServer::dealWithRead(int sockfd)
 
 void WebServer::dealWithWrite(int sockfd)
 {
-	UtilTimer* timer = m_usersTimer[sockfd].timer;
+	HeapTimer* timer = m_usersTimer[sockfd].timer;
 	if (m_actormodel == REACTOR) {
 		if (timer) {
 			adjustTimer(timer);
@@ -374,4 +373,42 @@ void WebServer::dealWithWrite(int sockfd)
 			dealTimer(timer, sockfd);
 		}
 	}
+}
+
+int WebServer::initDaemon()
+{
+	/* 忽略终端I/O信号，STOP信号 */
+	signal(SIGTTOU, SIG_IGN);
+	signal(SIGTTIN, SIG_IGN);
+	signal(SIGSTOP, SIG_IGN);
+	signal(SIGHUP, SIG_IGN);
+
+	int pid = fork();
+	if (pid > 0) {
+		/* 结束父进程，使得子进程成为后台进程 */
+		exit(0);
+	}
+	else if (pid < 0) {
+		return -1;
+	}
+	/* 建立一个新的进程组，使得子进程成为这个进程组的首进程 */
+	setsid();
+	/* 再次创建一个子进程，退出父进程，保证该进程不是进程组组长 */
+	pid = fork();
+	if (pid > 0) {
+		exit(0);
+	}
+	else if (pid < 0) {
+		return -1;
+	}
+	/* 关闭所有从父进程继承的不再需要的文件描述符 */
+	for (int i = 0; i < NOFILE; ++i) {
+		close(i);
+	}
+	/* 将屏蔽字设置为0 */
+	umask(0);
+	/* 忽略SIGCHLD信号 */
+	signal(SIGCHLD, SIG_IGN);
+
+	return 0;
 }
